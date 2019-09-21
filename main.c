@@ -13,10 +13,10 @@ TODO
 
 int window_width = 1440;
 int window_height = 900;
-int plot_size = 20;
+float plot_size = 20;
 int pixels_per_unit = 15;
 
-void draw_line_in_world(SDL_Renderer *renderer, int x1, int y1, int x2, int y2)
+void draw_world_line(SDL_Renderer *renderer, float x1, float y1, float x2, float y2)
 {
     int window_half_width = window_width / 2;
     int window_half_height = window_height / 2;
@@ -60,7 +60,7 @@ void draw_grid(SDL_Renderer *renderer, Vector x_basis, Vector y_basis, Uint8 r, 
         Vector gridline_end = {plot_size, y};
         Vector gridline_end_xformed = linear_xform(gridline_end, x_basis, y_basis);
 
-        draw_line_in_world(
+        draw_world_line(
             renderer,
             gridline_start_xformed.x,
             gridline_start_xformed.y,
@@ -88,7 +88,7 @@ void draw_grid(SDL_Renderer *renderer, Vector x_basis, Vector y_basis, Uint8 r, 
         Vector gridline_end = {x, plot_size};
         Vector gridline_end_xformed = linear_xform(gridline_end, x_basis, y_basis);
 
-        draw_line_in_world(
+        draw_world_line(
             renderer,
             gridline_start_xformed.x,
             gridline_start_xformed.y,
@@ -146,8 +146,11 @@ int main(int argc, char const *argv[])
     Vector original_x_basis = {1, 0};
     Vector original_y_basis = {0, 1};
 
-    Vector new_x_basis = {2, 1};
-    Vector new_y_basis = {1, 2};
+    float new_x_basis_x = 1;
+    float new_x_basis_y = 0;
+
+    float new_y_basis_x = 1;
+    float new_y_basis_y = 2;
 
     while (running)
     {
@@ -202,6 +205,11 @@ int main(int argc, char const *argv[])
             pixels_per_unit--;
         }
 
+        new_x_basis_y -= 0.001;
+
+        Vector new_x_basis = {new_x_basis_x, new_x_basis_y};
+        Vector new_y_basis = {new_y_basis_x, new_y_basis_y};
+
         // Render
 
         // Clear to black
@@ -211,14 +219,14 @@ int main(int argc, char const *argv[])
         draw_grid(renderer, original_x_basis, original_y_basis, 255, 255, 255);
 
         SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        draw_line_in_world(renderer, 0, 0, v1.x, v1.y);
+        draw_world_line(renderer, 0, 0, v1.x, v1.y);
 
         draw_grid(renderer, new_x_basis, new_y_basis, 0, 255, 255);
 
         Vector v2 = linear_xform(v1, new_x_basis, new_y_basis);
 
         SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-        draw_line_in_world(renderer, 0, 0, v2.x, v2.y);
+        draw_world_line(renderer, 0, 0, v2.x, v2.y);
 
         // Blit
         SDL_RenderPresent(renderer);
