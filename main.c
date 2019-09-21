@@ -14,7 +14,7 @@ TODO
 int window_width = 1440;
 int window_height = 900;
 float plot_size = 20;
-int pixels_per_unit = 15;
+int pixels_per_unit = 20;
 
 void draw_world_line(SDL_Renderer *renderer, float x1, float y1, float x2, float y2)
 {
@@ -146,11 +146,8 @@ int main(int argc, char const *argv[])
     Vector original_x_basis = {1, 0};
     Vector original_y_basis = {0, 1};
 
-    float new_x_basis_x = 1;
-    float new_x_basis_y = 0;
-
-    float new_y_basis_x = 1;
-    float new_y_basis_y = 2;
+    Vector new_x_basis = original_x_basis;
+    Vector new_y_basis = original_y_basis;
 
     while (running)
     {
@@ -205,10 +202,8 @@ int main(int argc, char const *argv[])
             pixels_per_unit--;
         }
 
-        new_x_basis_y -= 0.001;
-
-        Vector new_x_basis = {new_x_basis_x, new_x_basis_y};
-        Vector new_y_basis = {new_y_basis_x, new_y_basis_y};
+        new_x_basis.x -= 0.001;
+        new_x_basis.y -= 0.001;
 
         // Render
 
