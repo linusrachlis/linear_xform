@@ -10,9 +10,11 @@ TODO
 
 #include "types.h"
 
+#define MAX_VECTORS 32
+
 int window_width = 1440;
 int window_height = 900;
-float plot_size = 20;
+float grid_size = 20;
 int pixels_per_unit = 20;
 
 void draw_world_line(SDL_Renderer *renderer, float x1, float y1, float x2, float y2)
@@ -29,6 +31,19 @@ void draw_world_line(SDL_Renderer *renderer, float x1, float y1, float x2, float
     SDL_RenderDrawLine(renderer, x1_pixels, y1_pixels, x2_pixels, y2_pixels);
 }
 
+Vector get_vector_from_screen_coords(int x, int y)
+{
+    Vector result;
+
+    // TODO compress
+    int window_half_width = window_width / 2;
+    int window_half_height = window_height / 2;
+
+    result.x = (x - window_half_width) / (float)pixels_per_unit;
+    result.y = -(y - window_half_height) / (float)pixels_per_unit;
+    return result;
+}
+
 Vector linear_xform(Vector input, Vector new_x_basis, Vector new_y_basis)
 {
     Vector result;
@@ -39,12 +54,9 @@ Vector linear_xform(Vector input, Vector new_x_basis, Vector new_y_basis)
 
 void draw_grid(SDL_Renderer *renderer, Vector x_basis, Vector y_basis, Uint8 r, Uint8 g, Uint8 b)
 {
-    // printf("===========================================\n");
-    // printf("drawing grid\n\n");
+    // TODO compress
 
-    // printf("looping Y.........\n");
-    // printf("------------------------------------\n");
-    for (int y = -plot_size; y < plot_size; ++y)
+    for (int y = -grid_size; y < grid_size; ++y)
     {
         if (y == 0)
         {
@@ -53,10 +65,10 @@ void draw_grid(SDL_Renderer *renderer, Vector x_basis, Vector y_basis, Uint8 r, 
             SDL_SetRenderDrawColor(renderer, r, g, b, 128);
         }
 
-        Vector gridline_start = {-plot_size, y};
+        Vector gridline_start = {-grid_size, y};
         Vector gridline_start_xformed = linear_xform(gridline_start, x_basis, y_basis);
 
-        Vector gridline_end = {plot_size, y};
+        Vector gridline_end = {grid_size, y};
         Vector gridline_end_xformed = linear_xform(gridline_end, x_basis, y_basis);
 
         draw_world_line(
@@ -68,11 +80,7 @@ void draw_grid(SDL_Renderer *renderer, Vector x_basis, Vector y_basis, Uint8 r, 
         );
     }
 
-    // printf("------------------------------------\n");
-    // printf("looping X.........\n");
-    // printf("------------------------------------\n");
-
-    for (int x = -plot_size; x < plot_size; ++x)
+    for (int x = -grid_size; x < grid_size; ++x)
     {
         if (x == 0)
         {
@@ -81,10 +89,10 @@ void draw_grid(SDL_Renderer *renderer, Vector x_basis, Vector y_basis, Uint8 r, 
             SDL_SetRenderDrawColor(renderer, r, g, b, 128);
         }
 
-        Vector gridline_start = {x, -plot_size};
+        Vector gridline_start = {x, -grid_size};
         Vector gridline_start_xformed = linear_xform(gridline_start, x_basis, y_basis);
 
-        Vector gridline_end = {x, plot_size};
+        Vector gridline_end = {x, grid_size};
         Vector gridline_end_xformed = linear_xform(gridline_end, x_basis, y_basis);
 
         draw_world_line(
@@ -95,8 +103,6 @@ void draw_grid(SDL_Renderer *renderer, Vector x_basis, Vector y_basis, Uint8 r, 
             gridline_end_xformed.y
         );
     }
-
-    // printf("=================================================\n");
 }
 
 int main(int argc, char const *argv[])
@@ -140,7 +146,15 @@ int main(int argc, char const *argv[])
     int pressed_left_this_frame = 0;
     int pressed_right_this_frame = 0;
 
-    Vector v1 = {5, 2};
+    int clicked_left_this_frame = 0;
+    int clicked_left_x = 0;
+    int clicked_left_y = 0;
+    int is_dragging = 0;
+    int dragging_x = 0;
+    int dragging_y = 0;
+
+    Vector vectors[MAX_VECTORS] = {};
+    int vector_count = 0;
 
     Vector original_x_basis = {1, 0};
     Vector original_y_basis = {0, 1};
@@ -156,6 +170,7 @@ int main(int argc, char const *argv[])
         pressed_down_this_frame = 0;
         pressed_left_this_frame = 0;
         pressed_right_this_frame = 0;
+        clicked_left_this_frame = 0;
 
         while (SDL_PollEvent(&event))
         {
@@ -164,6 +179,16 @@ int main(int argc, char const *argv[])
 
             switch (event.type)
             {
+                case SDL_MOUSEBUTTONDOWN:
+                    if (event.button.button == SDL_BUTTON_LEFT)
+                    {
+                        clicked_left_this_frame = 1;
+                        clicked_left_x = event.button.x;
+                        clicked_left_y = event.button.y;
+                    }
+                    break;
+                case SDL_MOUSEMOTION:
+                    break;
                 case SDL_QUIT:
                     running = 0;
                     break;
@@ -213,6 +238,14 @@ int main(int argc, char const *argv[])
         }
         loop_counter++;
 
+        if (clicked_left_this_frame)
+        {
+            vectors[vector_count] = get_vector_from_screen_coords(clicked_left_x, clicked_left_y);
+            vector_count++;
+            vector_count %= MAX_VECTORS + 1;
+            printf("vector_count = %d\n", vector_count);
+        }
+
         // Render
 
         // Clear to black
@@ -221,15 +254,18 @@ int main(int argc, char const *argv[])
 
         draw_grid(renderer, original_x_basis, original_y_basis, 255, 255, 255);
 
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        draw_world_line(renderer, 0, 0, v1.x, v1.y);
-
         draw_grid(renderer, new_x_basis, new_y_basis, 0, 255, 255);
 
-        Vector v2 = linear_xform(v1, new_x_basis, new_y_basis);
+        for (int i = 0; i < vector_count; ++i)
+        {
+            Vector original_vector = vectors[i];
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            draw_world_line(renderer, 0, 0, original_vector.x, original_vector.y);
 
-        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-        draw_world_line(renderer, 0, 0, v2.x, v2.y);
+            Vector xformed_vector = linear_xform(original_vector, new_x_basis, new_y_basis);
+            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+            draw_world_line(renderer, 0, 0, xformed_vector.x, xformed_vector.y);
+        }
 
         // Blit
         SDL_RenderPresent(renderer);
