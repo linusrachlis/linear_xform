@@ -1,6 +1,5 @@
 /*
 TODO
-- display current transform in console
 - left click to add line in original space
 - right-drag to adjust transformed space
 - render current transform in font
@@ -149,6 +148,8 @@ int main(int argc, char const *argv[])
     Vector new_x_basis = original_x_basis;
     Vector new_y_basis = original_y_basis;
 
+    char loop_counter = 0;
+
     while (running)
     {
         pressed_up_this_frame = 0;
@@ -204,6 +205,13 @@ int main(int argc, char const *argv[])
 
         new_x_basis.x -= 0.001;
         new_x_basis.y -= 0.001;
+
+        if (loop_counter % 64 == 0)
+        {
+            printf("X basis = [ %f, %f ]\n", new_x_basis.x, new_x_basis.y);
+            printf("Y basis = [ %f, %f ]\n\n", new_y_basis.x, new_y_basis.y);
+        }
+        loop_counter++;
 
         // Render
 
