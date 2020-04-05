@@ -44,6 +44,14 @@ Vector get_vector_from_screen_coords(int x, int y)
     return result;
 }
 
+Vector pixel_vector_to_world(int screen_x, int screen_y)
+{
+    Vector result;
+    result.x = screen_x / (float)pixels_per_unit;
+    result.y = -screen_y / (float)pixels_per_unit;
+    return result;
+}
+
 Vector linear_xform(Vector input, Vector new_x_basis, Vector new_y_basis)
 {
     Vector result;
@@ -136,22 +144,16 @@ int main(int argc, char const *argv[])
 
     int running = 1;
 
-    int pressing_up = 0;
-    int pressing_down = 0;
-    int pressing_left = 0;
-    int pressing_right = 0;
+    int zoomed_in_this_frame = 0;
+    int zoomed_out_this_frame = 0;
 
-    int pressed_up_this_frame = 0;
-    int pressed_down_this_frame = 0;
-    int pressed_left_this_frame = 0;
-    int pressed_right_this_frame = 0;
+    int add_vector_this_frame = 0;
+    Vector new_vector_screen_coords = {};
 
-    int clicked_left_this_frame = 0;
-    int clicked_left_x = 0;
-    int clicked_left_y = 0;
-    int is_dragging = 0;
-    int dragging_x = 0;
-    int dragging_y = 0;
+    int is_dragging_x_basis = 0;
+    int is_dragging_y_basis = 0;
+    Vector mouse_motion_this_frame = {};
+    Vector mouse_position = {};
 
     Vector vectors[MAX_VECTORS] = {};
     int vector_count = 0;
@@ -162,91 +164,108 @@ int main(int argc, char const *argv[])
     Vector new_x_basis = original_x_basis;
     Vector new_y_basis = original_y_basis;
 
-    char loop_counter = 0;
-
     while (running)
     {
-        pressed_up_this_frame = 0;
-        pressed_down_this_frame = 0;
-        pressed_left_this_frame = 0;
-        pressed_right_this_frame = 0;
-        clicked_left_this_frame = 0;
+        //////////// Collect input ////////////
+
+        add_vector_this_frame = 0;
+        mouse_motion_this_frame = (Vector){};
+        zoomed_out_this_frame = 0;
+        zoomed_in_this_frame = 0;
 
         while (SDL_PollEvent(&event))
         {
-            char *keysym;
-            char *state;
-
             switch (event.type)
             {
-                case SDL_MOUSEBUTTONDOWN:
-                    if (event.button.button == SDL_BUTTON_LEFT)
+                case SDL_KEYDOWN:
+                    if (!event.key.repeat)
                     {
-                        clicked_left_this_frame = 1;
-                        clicked_left_x = event.button.x;
-                        clicked_left_y = event.button.y;
+                        if (event.key.keysym.sym == SDLK_RETURN)
+                        {
+                            add_vector_this_frame = 1;
+                        }
+                        else if (event.key.keysym.sym == SDLK_x)
+                        {
+                            is_dragging_x_basis = 1;
+                        }
+                        else if (event.key.keysym.sym == SDLK_y)
+                        {
+                            is_dragging_y_basis = 1;
+                        }
+                    }
+                    break;
+                case SDL_KEYUP:
+                    if (!event.key.repeat)
+                    {
+                        if (event.key.keysym.sym == SDLK_x)
+                        {
+                            is_dragging_x_basis = 0;
+                        }
+                        else if (event.key.keysym.sym == SDLK_y)
+                        {
+                            is_dragging_y_basis = 0;
+                        }
+                    }
+                    break;
+                case SDL_MOUSEWHEEL:
+                    if(event.wheel.y > 0) // scroll up
+                    {
+                         zoomed_in_this_frame = 1;
+                    }
+                    else if(event.wheel.y < 0) // scroll down
+                    {
+                         zoomed_out_this_frame = 1;
                     }
                     break;
                 case SDL_MOUSEMOTION:
+                    mouse_motion_this_frame.x = event.motion.xrel;
+                    mouse_motion_this_frame.y = event.motion.yrel;
+                    mouse_position.x = event.motion.x;
+                    mouse_position.y = event.motion.y;
                     break;
                 case SDL_QUIT:
                     running = 0;
                     break;
-                case SDL_KEYDOWN:
-                case SDL_KEYUP:
-                    switch (event.key.keysym.sym)
-                    {
-                        case SDLK_UP:
-                            pressing_up = event.key.state == SDL_PRESSED;
-                            pressed_up_this_frame = pressing_up;
-                            break;
-                        case SDLK_DOWN:
-                            pressing_down = event.key.state == SDL_PRESSED;
-                            pressed_down_this_frame = pressing_down;
-                            break;
-                        case SDLK_LEFT:
-                            pressing_left = event.key.state == SDL_PRESSED;
-                            pressed_left_this_frame = pressing_left;
-                            break;
-                        case SDLK_RIGHT:
-                            pressing_right = event.key.state == SDL_PRESSED;
-                            pressed_right_this_frame = pressing_right;
-                            break;
-                    }
-                    break;
             }
         }
 
-        // Simulate
+        //////////// Simulate ////////////
 
-        if (pressed_up_this_frame)
+        if (zoomed_in_this_frame)
         {
             pixels_per_unit++;
         }
-        else if (pressed_down_this_frame)
+        else if (zoomed_out_this_frame)
         {
             pixels_per_unit--;
         }
 
-        new_x_basis.x -= 0.001;
-        new_x_basis.y -= 0.001;
-
-        if (loop_counter % 64 == 0)
+        if (is_dragging_x_basis)
         {
+            // TODO that's why i needed to record where the mouse starts, so the movement can be "scaled" correctly.
+            // also, yeah, one mouse movement can only define have a transformation, or one of the bases.
+            Vector mouse_drag_in_world_units = pixel_vector_to_world(mouse_motion_this_frame.x, mouse_motion_this_frame.y);
+            new_x_basis.x += mouse_drag_in_world_units.x;
+            new_x_basis.y += mouse_drag_in_world_units.y;
             printf("X basis = [ %f, %f ]\n", new_x_basis.x, new_x_basis.y);
+        }
+
+        if (is_dragging_y_basis)
+        {
+            Vector mouse_drag_in_world_units = pixel_vector_to_world(mouse_motion_this_frame.x, mouse_motion_this_frame.y);
+            new_y_basis.x += mouse_drag_in_world_units.x;
+            new_y_basis.y += mouse_drag_in_world_units.y;
             printf("Y basis = [ %f, %f ]\n\n", new_y_basis.x, new_y_basis.y);
         }
-        loop_counter++;
 
-        if (clicked_left_this_frame)
+        if (add_vector_this_frame)
         {
-            vectors[vector_count] = get_vector_from_screen_coords(clicked_left_x, clicked_left_y);
+            vectors[vector_count] = get_vector_from_screen_coords(mouse_position.x, mouse_position.y);
             vector_count++;
             vector_count %= MAX_VECTORS + 1;
-            printf("vector_count = %d\n", vector_count);
         }
 
-        // Render
+        /////////////// Render ///////////////
 
         // Clear to black
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
